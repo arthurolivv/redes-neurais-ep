@@ -1,4 +1,6 @@
 import math
+import matplotlib.pyplot as plt
+import numpy as np
 
 X = [
     [0,0],
@@ -7,7 +9,7 @@ X = [
     [1,1]
 ]
 
-y = [0, 0, 0, 1]
+y = [0, 1, 1, 0]
 
 for i in range(4):
     print(X[i], y[i])
@@ -17,12 +19,12 @@ w2 = 0.56
 bias = 0.15
 
 def sigmoid(x):
-    return 1/ (1+ math.exp(-x))
+    return 1 / (1+ math.exp(-x))
 
 
 taxa_aprendizagem = 0.1
 
-for epoca in range (50000): #condicao de parada qualquer
+for epoca in range (5000): #condicao de parada qualquer
     for i in range(4): #para cada s:t
 
         x1 = X[i][0]
@@ -57,4 +59,34 @@ for epoca in range (50000): #condicao de parada qualquer
         print('new w2 = ', w2)
         print('new bias = ', bias)
 
+# cria uma grade de pontos
+x_values = np.linspace(0, 1, 100)
+y_values = np.linspace(0, 1, 100)
 
+Z = []
+
+for x in x_values:
+    linha = []
+    for y_ in y_values:
+        y_in = x * w1 + y_ * w2 + bias
+        saida = sigmoid(y_in)
+        linha.append(saida)
+    Z.append(linha)
+
+Z = np.array(Z)
+
+# plot
+plt.imshow(Z, extent=(0,1,0,1), origin='lower')
+plt.colorbar()
+
+# pontos reais
+for i in range(4):
+    x1, x2 = X[i]
+    plt.scatter(x1, x2)
+
+plt.xlabel("x1")
+plt.ylabel("x2")
+plt.title("Superfície aprendida pela rede")
+
+plt.savefig("grafico.png")
+print("Gráfico salvo como grafico.png")
