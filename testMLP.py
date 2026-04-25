@@ -26,61 +26,36 @@ taxa_aprendizagem = 0.1
 #=========================
 # 2. Camada Oculta
 #=========================
-camada = []
-mapeamento = [2, 4, 5, 6, 1]
-
-for m in range(len(mapeamento) - 1):
-    entrada = mapeamento[m]
-    saida = mapeamento[m+1]
-
-    pesos = []
-    bias = []
-
-    for j in range(saida):
-        pesos.append([random.random() for _ in range(entrada)])
-        bias.append(random.random())
-
-    camada.append({
-        "pesos": pesos,
-        "bias": bias
-    })
-
-#for c in range(camadas):
-#    neuron = 3
-#    pesos_hidden = []
-#    bias_hidden = []
-#    for i in range(neuron):
-#        pesos_hidden.append([random.random(), random.random()])
-#        bias_hidden.append(random.random())
+neuron = 3
+pesos_hidden = []
+bias_hidden = []
+for i in range(neuron):
+    pesos_hidden.append([random.random(), random.random()])
+    bias_hidden.append(random.random())
 
 #=========================
 # X. Console
 #=========================
+print('Total de Neuronios: ', neuron)
 print('tax_aprendizagem inicial: ', taxa_aprendizagem)
 print('-'*30)
 
-for c in range(len(camada)):
-    print('Camada:', c)
-    print('Total de Neuronios:', len(camada[c]["pesos"]))
-    print('='*30)
-
-    for i in range(len(camada[c]["pesos"])):
-        print(f"Neurônio {i}:")
-        print("Pesos:", camada[c]["pesos"][i])
-        print("Bias:", camada[c]["bias"][i])
-        print("-" * 30)
+for i in range(neuron):
+    print(f"Neurônio {i}:")
+    print(f"  Pesos: {pesos_hidden[i]}")
+    print(f"  Bias:  {bias_hidden[i]}")
+    print("-" * 30)
 
 #=========================
 # 3. Camada de Saida
 #=========================
+pesos_saida = []
+bias_saida = random.random()
+for i in range(neuron):
+    pesos_saida.append(random.random())
 
-#pesos_saida = []
-#bias_saida = random.random()
-#for i in range(neuron):
-#    pesos_saida.append(random.random())
-
-print('Pesos Saida: ', camada[-1]["pesos"])
-print('Bias Saida: ', camada[-1]["bias"])
+print('pesos saida: ', pesos_saida)
+print('bias saida: ', bias_saida)
 print("-" * 30)
 
 #=========================
@@ -189,8 +164,9 @@ for epoca in range (5): #condicao de parada qualquer
         print('-'*50)
         print('Entrada  | Saida Esperada   |  Saida Prevista')
         print('-'*50)
-
         for i in range(len(X)):
-            print(f"{X[i]}  |     |   saida prevista")
+            print(f"{X[i]}  |   saida esperada  |   saida prevista")
 
         print("="*80)
+
+        
