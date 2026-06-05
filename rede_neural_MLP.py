@@ -1,4 +1,16 @@
 # -*- coding: utf-8 -*-
+
+#-----------------------------------------------------------------------------------------------------------------
+#Universidade de São Paulo - Escola de Artes, Ciências e Humanidades
+#Disciplina: Inteligência Artificial
+#Docente: Sarajane Marques Peres
+#Projeto: Reconhecimento de Caracteres utilizando Redes Neurais Artificiais (MLP) - Multilayer Perceptron
+#
+#
+#
+#Ygor Araujo da Silva - 15506033
+#-----------------------------------------------------------------------------------------------------------------
+
 import math
 import random
 import seaborn as sns
@@ -56,10 +68,24 @@ def carrega_dataset(caminho_x, caminho_y):
     
     return X[:tamanho_minimo], Y[:tamanho_minimo], categorias
 
+def separar_dados_treino_teste(X, Y, proporcao_treino=0.8):
+    #unificando X e Y para embaralhar mantendo a correspondencia entre as amostras e as letras que representam
+    dados_combinados = list(zip(X, Y))
+    random.shuffle(dados_combinados)
+    
+    tamanho_treino = int(len(dados_combinados) * proporcao_treino)
+    
+    treino = dados_combinados[:tamanho_treino]
+    teste = dados_combinados[tamanho_treino:]
+    
+    #desempacota de volta para X e Y os dados
+    X_treino, Y_treino = zip(*treino)
+    X_teste, Y_teste = zip(*teste)
+    
+    return list(X_treino), list(Y_treino), list(X_teste), list(Y_teste)
 
 #Função de Ativação Sigmoid
 #Épsilon da Máquina no Python é 1,11e-16, ou seja, o menor número positivo que pode ser representado. Para evitar overflow em exp(-x) quando x é muito grande, limitamos x entre -36 e 36, pois exp(-36) é aproximadamente 2.3e-16, próximo do limite de precisão do Python. É possível chegar nesse valor igualando exp(-x) a 1,11e-16 e resolvendo a igualdade para x, o que dá aproximadamente 36.
-
 def sigmoid(x):
     x = max(-36, min(36, x))
     return 1 / (1 + math.exp(-x))
@@ -81,6 +107,44 @@ def criaCamada(entradas, neuronios):
         "pesos": pesos_rede_neural,
         "bias": bias_rede_neural
     }
+
+#Função auxiliar para salvar os hiperparâmetros da arquitetura e do treinamento da rede neural em um arquivo de texto
+def salvar_hiperparametros(caminho_arquivo, entradas, ocultos, saidas, taxa, epocas):
+    with open(caminho_arquivo, "w", encoding="utf-8") as arquivo:
+        arquivo.write("--- HIPERPARAMETROS DA ARQUITETURA E TREINAMENTO ---\n\n")
+        
+        arquivo.write("--- Estrutura da Rede ---\n")
+        arquivo.write(f"Neurônios na Camada de Entrada: {entradas}\n")
+        arquivo.write(f"Neurônios na Camada Oculta: {ocultos}\n")
+        arquivo.write(f"Neurônios na Camada de Saída: {saidas}\n\n")
+        
+        arquivo.write("--- Configurações de Aprendizado ---\n")
+        arquivo.write(f"Taxa de Aprendizagem (Alpha): {taxa}\n")
+        arquivo.write(f"Total de Épocas: {epocas}\n")
+        arquivo.write("Função de Ativação: Sigmoide\n")
+        
+    print(f"Sucesso: Hiperparâmetros salvos em '{caminho_arquivo}'!")
+
+#Função auxiliar para salvar os pesos iniciais da rede neural em um arquivo de texto, organizando os pesos por camada e por neurônio, e formatando os valores com 6 casas decimais para melhor legibilidade.
+def salvar_pesos(nome_arquivo, rede_neural):
+    with open(nome_arquivo, "w") as arquivo:
+        #Camada Oculta
+        arquivo.write("Camada Oculta\n")
+        pesos_hidden = rede_neural[0]["pesos"]
+        for i in range(len(pesos_hidden)):
+            linha_pesos = " ".join(f"{w:.6f}" for w in pesos_hidden[i])
+            arquivo.write(f"Pesos Neuronio {i}: {linha_pesos}\n")
+        
+        arquivo.write("\n")
+        
+        #Camada de Saída
+        arquivo.write("Camada Saída\n")
+        pesos_saida = rede_neural[1]["pesos"]
+        for i in range(len(pesos_saida)):
+            linha_pesos = " ".join(f"{w:.6f}" for w in pesos_saida[i])
+            arquivo.write(f"Pesos Neuronio {i}: {linha_pesos}\n")
+            
+    print(f"Sucesso: O arquivo '{nome_arquivo}' foi gerado na pasta do projeto!")
 
 #Calcula a soma ponderada das entradas multiplicadas pelos pesos correspondentes para um neurônio específico, e adiciona o bias desse neurônio à soma.
 def calculaSomatorioNeuronio(entradas, pesos_neuronio, bias_neuronio):
@@ -178,7 +242,7 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         if (epoca + 1) % 100 == 0 or epoca == 0:
             print(f"Época {epoca+1}/{epocas} - Erro Total: {erro_total:.6f}")
 
-    # Salva o arquivo contendo os erros por iteração conforme critério de entrega
+    # Salva o arquivo contendo os erros por épocas
     np.savetxt("erros_treinamento.txt", historico_erros, fmt="%.6f")
     
     # Chama a função visual do decaimento do erro
@@ -208,27 +272,90 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         
         print(f"Letra {idx+1:02d} | Em classe: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {max(y_prev):.4f}")
     print("-" * 75 + "\n")
+
+
+def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras):
+    camada_oculta = rede_neural[0]
+    pesos_hidden = camada_oculta["pesos"]
+    bias_hidden  = camada_oculta["bias"]
     
-    # Chama a função visual da matriz com as listas preenchidas
+    camada_saida  = rede_neural[1]
+    pesos_saida  = camada_saida["pesos"]
+    bias_saida   = camada_saida["bias"]
+
+    neuron_hidden = len(pesos_hidden)
+    neuron_saida = len(pesos_saida)
+
+    lista_esperados = []
+    lista_previstos = []
+    linhas_arquivo_saida = []
+
+    print("\nResultados do Conjunto de Teste:")
+    print("=" * 75)
+    print("Amostra | Letra Esperada | Letra Predita | Confiança")
+    print("=" * 75)
+
+    for idx in range(len(X_teste)):
+        # ------------------------- Feedforward: Camada Oculta -------------------------
+        funcao_ativacao_hidden = []
+        for j in range(neuron_hidden):
+            Z_in_hidden = calculaSomatorioNeuronio(X_teste[idx], pesos_hidden[j], bias_hidden[j])
+            funcao_ativacao_hidden.append(sigmoid(Z_in_hidden))
+
+        # ------------------------- Feedforward: Camada de Saída -------------------------
+        y_previsto = []
+        for o in range(neuron_saida):
+            Z_in_saida = calculaSomatorioNeuronio(funcao_ativacao_hidden, pesos_saida[o], bias_saida[o])
+            y_previsto.append(sigmoid(Z_in_saida))
+
+        # ------------------------- Avaliação da Amostra -------------------------
+        idx_esperado = Y_teste[idx].index(max(Y_teste[idx]))
+        idx_previsto = y_previsto.index(max(y_previsto))
+        
+        letra_esperada = mapeamento_letras[idx_esperado]
+        letra_prevista = mapeamento_letras[idx_previsto]
+        confianca = max(y_previsto)
+        
+        lista_esperados.append(letra_esperada)
+        lista_previstos.append(letra_prevista)
+        
+        print(f"Teste {idx+1:02d}  | Esperada: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {confianca:.4f}")
+        
+        # Prepara a linha para salvar no arquivo de log
+        linhas_arquivo_saida.append(f"Amostra {idx+1}: Esperada={letra_esperada}, Predita={letra_prevista}, Confianca={confianca:.4f}\n")
+
+    print("=" * 75 + "\n")
+
+    # ------------------------- Exportação de Resultados -------------------------
+    with open("saidas_teste.txt", "w") as arquivo_teste:
+        arquivo_teste.writelines(linhas_arquivo_saida)
+
+    #Gera a matriz de confusão para o vídeo
     plotar_matriz_confusao(lista_esperados, lista_previstos)
-    
+
 def main():
     diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
     
     caminho_x = os.path.join(diretorio_do_script, 'files-sarajane', 'CARACTERES COMPLETO', 'X.txt')
     caminho_y = os.path.join(diretorio_do_script, 'files-sarajane', 'CARACTERES COMPLETO', 'Y_letra.txt')
     
-    # X_dados, Y_dados e a lista mapeada de strings das letras detectadas
+    #X_dados, Y_dados e a lista mapeada de strings das letras detectadas
     X_dados, Y_dados, mapeamento_letras = carrega_dataset(caminho_x, caminho_y)
+    
+    #Separa os dados em 80% para treino e 20% para teste, mantendo a correspondencia entre as amostras e as letras que representam
+    X_treino, Y_treino, X_teste, Y_teste = separar_dados_treino_teste(X_dados, Y_dados, proporcao_treino=0.8)
     
     quantidade_entradas = len(X_dados[0])
     quantidade_saidas = len(Y_dados[0])
     
     print(f"--> Entradas extraídas (Atributos): {quantidade_entradas}")
-    print(f"--> Saídas extraídas (Classes mapeadas): {quantidade_saidas}\n")
+    print(f"--> Saídas extraídas (Classes mapeadas): {quantidade_saidas}")
+    print(f"--> Amostrar de Treino: {len(X_treino)}")
+    print(f"--> Amostrar de Teste: {len(X_teste)}\n")
 
-    # Ajustado para 30 neurônios ocultos para dar conta de uma complexidade maior (26 classes)
-    mapeamento = [quantidade_entradas, 30, quantidade_saidas]
+    # Ajustado 30 neuronios que serão utilizados na camada oculta
+    neuronios_ocultos = 30
+    mapeamento = [quantidade_entradas, neuronios_ocultos, quantidade_saidas]
     
     global rede_neural
     rede_neural = []
@@ -238,8 +365,29 @@ def main():
         nova_camada = criaCamada(entrada, saida)
         rede_neural.append(nova_camada)
         
-    # Executa o backpropagation passando o mapeamento das letras
-    backpropagation(X_dados, Y_dados, rede_neural, taxa_aprendizagem, epocas=1000, mapeamento_letras=mapeamento_letras)
-
+    #Salva os hiperparâmetros da arquitetura e do treinamento da rede neural em um arquivo de texto para documentação
+    caminho_hiperparametros = os.path.join(diretorio_do_script, "hiperparametros.txt")
+    epocas_treino = 1000
+    salvar_hiperparametros(
+        caminho_hiperparametros, 
+        quantidade_entradas, 
+        neuronios_ocultos, 
+        quantidade_saidas, 
+        taxa_aprendizagem, 
+        epocas_treino
+    )
+    
+    #Salva os pesos iniciais gerados aleatoriamente na rede neural antes de iniciar o treinamento
+    salvar_pesos("pesos_iniciais.txt", rede_neural)
+        
+    #Executa o backpropagation passando o mapeamento das letras
+    backpropagation(X_treino, Y_treino, rede_neural, taxa_aprendizagem, epocas=epocas_treino, mapeamento_letras=mapeamento_letras)
+    
+    #Salva os pesos finais da rede neural após o treinamento
+    salvar_pesos("pesos_finais.txt", rede_neural)
+    
+    #Avaliação final utilizando os dados de teste
+    testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras)
+    
 if __name__ == "__main__":
     main()
