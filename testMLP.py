@@ -7,32 +7,43 @@ import pandas as pd
 import os
 import re
 
+rede_neural = []
+taxa_aprendizagem = 0.1
+pixels = 63
+
 def carrega_dataset(caminho_x, caminho_y):
-    # ------------------ PROCESSAMENTO DO ARQUIVO X ------------------
+    #---------------------------[Processamento do Arquivo X]---------------------------
+    #caminho_x contém os dados de entrada numéricos do X.txt fornecido na pasta "CARACTERES COMPLETO"
     with open(caminho_x, 'r', encoding='utf-8') as f:
         texto_completo = f.read()
     
+    #extrai todos os números no X.txt usando regex, convertendo-os para float e os armazenando em uma lista
     valores_numerais = [float(f) for f in re.findall(r'-?\d+', texto_completo)]
     
+    #total de elementos lidos do arquivo X.txt
     total_elementos = len(valores_numerais)
-    sobra = total_elementos % 63
     
-    if sobra != 0:
+    #verifica se o total de elementos é multiplo de 63 (número de pixels), caso contrário, remove os elementos excedentes
+    sobra = total_elementos % pixels
+    if sobra !      = 0:
         valores_numerais = valores_numerais[:total_elementos - sobra]
     
-    X = np.array(valores_numerais).reshape(-1, 63).tolist()
+    #reorganiza os valores em uma matriz onde cada linha é um caracter e cada coluna é um pixel, depois converte essa matriz para uma lista de listas que serão utilizadas como entrada para a rede neural e outras funções logo abaixo no código
+    X = np.array(valores_numerais).reshape(-1, pixels).tolist()
     
-    # ------------------ PROCESSAMENTO DO ARQUIVO Y ------------------
+    #---------------------------[Processamento do Arquivo Y]---------------------------
+    #carrega o arquivo Y_letra.txt usando pandas para uma coluna sem cabeçalho e nomeada'Letra'
     df_y = pd.read_csv(caminho_y, header=None, names=['Letra'])
     df_y['Letra'] = df_y['Letra'].str.strip().str.upper()
     
-    # CORREÇÃO: Mapeia dinamicamente todas as letras presentes (A-Z)
+    #mapeia todas as letras presentes no arquivo Y_letra.txt
     categorias = sorted(df_y['Letra'].dropna().unique())
-    print(f"DEBUG: Letras detectadas no arquivo Y: {categorias}")
+    print(f"DEBUG: Letras detectadas no arquivo Y_letra.txt: {categorias}")
     
+    #define o dataframe da coluna 'Letra' como categórico, garantindo que todas as letras sejam reconhecidas como categorias diferentes
     df_y['Letra'] = pd.Categorical(df_y['Letra'], categories=categorias)
     
-    # Gera a matriz One-Hot (0.0 e 1.0) para todas as categorias detectadas
+    #gera uma matriz One-Hot (0.0 e 1.0) para todas as categorias detectadas, ou seja, as letras
     Y = pd.get_dummies(df_y['Letra'], dtype=float).values.tolist()
     
     tamanho_minimo = min(len(X), len(Y))
@@ -43,13 +54,15 @@ def carrega_dataset(caminho_x, caminho_y):
     
     return X[:tamanho_minimo], Y[:tamanho_minimo], categorias
 
-taxa_aprendizagem = 0.1
-rede_neural = []
+
+#Função de Ativação Sigmoid
+#Épsilon da Máquina no Python é 1,11e-16, ou seja, o menor número positivo que pode ser representado. Para evitar overflow em exp(-x) quando x é muito grande, limitamos x entre -36 e 36, pois exp(-36) é aproximadamente 2.3e-16, próximo do limite de precisão do Python. É possível chegar nesse valor igualando exp(-x) a 1,11e-16 e resolvendo a igualdade para x, o que dá aproximadamente 36.
 
 def sigmoid(x):
-    x = max(-500, min(500, x))
+    x = max(-36, min(36, x))
     return 1 / (1 + math.exp(-x))
 
+#Derivada da Função Sigmoid é calculada usando a propriedade de que a derivada de sigmoid(x) pode ser expressa em termos do próprio sigmoid(x), ou seja, sigmoid'(x) = sigmoid(x) * (1 - sigmoid(x)). Isso é útil porque durante o backpropagation, já temos o valor de sigmoid(x) que é o Y calculado, então podemos usar esse valor para calcular a derivada de forma eficiente sem precisar recalcular a função sigmoid para somente depois fazer a derivada.
 def derivadaSigmoid(Y):
     return Y * (1.0 - Y)
     
@@ -58,8 +71,8 @@ def criaCamada(entradas, neuronios):
     bias_rede_neural = []
     
     for n in range(neuronios):
-        pesos_rede_neural.append(
-            [random.uniform(-0.1, 0.1) for _ in range(entradas)])
+        #cria uma lista de pesos para cada neurônio de entrada, onde cada peso é um número aleatório entre -0.1 e 0.1, e adiciona essa lista de pesos à lista geral de pesos da rede neural. Além disso, para cada neurônio, também é criado um bias aleatório entre -0.1 e 0.1, que é adicionado à lista de bias da rede neural.
+        pesos_rede_neural.append([random.uniform(-0.1, 0.1) for _ in range(entradas)])
         bias_rede_neural.append(random.uniform(-0.1, 0.1))
     
     return {
@@ -67,6 +80,7 @@ def criaCamada(entradas, neuronios):
         "bias": bias_rede_neural
     }
 
+#Calcula a soma ponderada das entradas multiplicadas pelos pesos correspondentes para um neurônio específico, e adiciona o bias desse neurônio à soma.
 def calculaSomatorioNeuronio(entradas, pesos_neuronio, bias_neuronio):
     soma_ponderada = 0
     for i in range(len(entradas)):
@@ -74,6 +88,7 @@ def calculaSomatorioNeuronio(entradas, pesos_neuronio, bias_neuronio):
     soma_ponderada += bias_neuronio
     
     return soma_ponderada
+
 
 def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_letras):
     camada_oculta = rede_neural[0]
