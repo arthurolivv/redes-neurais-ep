@@ -1,0 +1,66 @@
+digraph G {
+    // Configurações gerais do desenho
+    rankdir=LR;
+    splines=line;
+    nodesep=0.7;
+    ranksep=4.0; // Espaçamento aumentado para caber o nome das variáveis
+
+    // ------------------------- CAMADA DE ENTRADA -------------------------
+    subgraph cluster_entrada {
+        color=transparent;
+        node [shape=circle, style=filled, color=lightblue, fontcolor=black];
+        
+        X0 [label="Pixel 0"];
+        X1 [label="Pixel 1"];
+        X_pontos [label="...", shape=plaintext, style=solid, color=transparent];
+        X119 [label="Pixel 119"];
+        
+        label="Camada de Entrada\n(120 Pixels)";
+    }
+
+    // ------------------------- CAMADA OCULTA -------------------------
+    subgraph cluster_oculta {
+        color=transparent;
+        node [shape=circle, style=filled, color=lightgreen, fontcolor=black];
+        
+        H0 [label="Oculto 0"];
+        H1 [label="Oculto 1"];
+        H_pontos [label="...", shape=plaintext, style=solid, color=transparent];
+        H29 [label="Oculto 29"];
+        
+        label="Camada Oculta\n(30 Neurônios)";
+    }
+
+    // ------------------------- CAMADA DE SAÍDA -------------------------
+    subgraph cluster_saida {
+        color=transparent;
+        node [shape=circle, style=filled, color=salmon, fontcolor=black];
+        
+        Y0 [label="Letra A\n(k=0)"];
+        Y1 [label="Letra B\n(k=1)"];
+        Y_pontos [label="...", shape=plaintext, style=solid, color=transparent];
+        Y25 [label="Letra Z\n(k=25)"];
+        
+        label="Camada de Saída\n(26 Letras)";
+    }
+
+    // ------------------------- CONEXÕES E VARIÁVEIS -------------------------
+    
+    // Conexões: Entrada -> Oculta (Matriz pesos_hidden[j][l])
+    X0 -> H0 [label="pesos_hidden[0][0]", fontcolor=blue, fontsize=11, color=gray60];
+    X0 -> H1 [label="pesos_hidden[1][0]", fontcolor=blue, fontsize=11, color=gray60];
+    X1 -> H0 [label="pesos_hidden[0][1]", fontcolor=blue, fontsize=11, color=gray60];
+    
+    X_pontos -> H_pontos [color=gray80, style=dotted];
+    
+    X119 -> H29 [label="pesos_hidden[29][119]", fontcolor=blue, fontsize=11, color=gray60];
+
+    // Conexões: Oculta -> Saída (Matriz pesos_saida[k][j])
+    H0 -> Y0 [label="pesos_saida[0][0]", fontcolor=red, fontsize=11, color=gray60];
+    H0 -> Y1 [label="pesos_saida[1][0]", fontcolor=red, fontsize=11, color=gray60];
+    H1 -> Y0 [label="pesos_saida[0][1]", fontcolor=red, fontsize=11, color=gray60];
+    
+    H_pontos -> Y_pontos [color=gray80, style=dotted];
+    
+    H29 -> Y25 [label="pesos_saida[25][29]", fontcolor=red, fontsize=11, color=gray60];
+}

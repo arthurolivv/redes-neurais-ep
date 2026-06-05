@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import math
 import random
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,7 +10,8 @@ import re
 
 rede_neural = []
 taxa_aprendizagem = 0.1
-pixels = 63
+#imagens png são 12x10, totalizando 120 pixels por caracter, ou seja, 120 atributos de entrada para a rede neural
+pixels = 120 
 
 def carrega_dataset(caminho_x, caminho_y):
     #---------------------------[Processamento do Arquivo X]---------------------------
@@ -25,7 +27,7 @@ def carrega_dataset(caminho_x, caminho_y):
     
     #verifica se o total de elementos é multiplo de 63 (número de pixels), caso contrário, remove os elementos excedentes
     sobra = total_elementos % pixels
-    if sobra !      = 0:
+    if sobra != 0:
         valores_numerais = valores_numerais[:total_elementos - sobra]
     
     #reorganiza os valores em uma matriz onde cada linha é um caracter e cada coluna é um pixel, depois converte essa matriz para uma lista de listas que serão utilizadas como entrada para a rede neural e outras funções logo abaixo no código
@@ -89,6 +91,28 @@ def calculaSomatorioNeuronio(entradas, pesos_neuronio, bias_neuronio):
     
     return soma_ponderada
 
+#Função auxiliar para calcular a soma dos erros quadráticos entre os valores reais e os valores previstos pela rede neural. A função itera sobre cada elemento das listas de valores reais e previstos, calcula a diferença ao quadrado para cada elemento, e retorna a soma total multiplicada por 0.5, que é a fórmula do erro quadrático médio (MSE) utilizado como critério de avaliação do desempenho da rede neural durante o treinamento.
+def calculaSomaErrosQuadraticos(y_real, y_previsto):
+    return 0.5 * sum((y_real[k] - y_previsto[k]) ** 2 for k in range(len(y_real)))
+
+#Função auxiliar para plotar o gráfico de erro total ao longo das épocas, utilizando a biblioteca Matplotlib. O gráfico exibe o decaimento do erro total, permitindo visualizar a convergência do treinamento da rede neural.
+def plotar_grafico_erro(historico_erros):
+    plt.figure(figsize=(10, 6))
+    plt.plot(historico_erros, color='blue', linewidth=2)
+    plt.title('Decaimento do Erro Total ao Longo das Épocas')
+    plt.xlabel('Épocas')
+    plt.ylabel('Erro Total')
+    plt.grid(True)
+    plt.show()
+
+#Função auxiliar para plotar a matriz de confusão utilizando a biblioteca Seaborn. A matriz de confusão é gerada a partir das listas de valores esperados e previstos, e é exibida como um mapa de calor, facilitando a visualização do desempenho da rede neural na classificação das letras.
+def plotar_matriz_confusao(lista_esperados, lista_previstos):
+    matriz = pd.crosstab(pd.Series(lista_esperados, name='Esperado'), pd.Series(lista_previstos, name='Previsto'))
+    
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(matriz, annot=True, fmt='d', cmap='Blues', cbar=False)
+    plt.title('Matriz de Confusão')
+    plt.show()
 
 def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_letras):
     camada_oculta = rede_neural[0]
@@ -102,7 +126,7 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
     neuron_hidden = len(pesos_hidden)
     neuron_saida = len(pesos_saida)
 
-    # Lista para salvar o histórico de erros (Requisito de entrega!)
+    #Lista para salvar o histórico de erros (Requisito de entrega!)
     historico_erros = []
 
     for epoca in range(epocas):
@@ -113,17 +137,17 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
             #------------------------- Feedforward: Camada Oculta -------------------------
             funcao_ativacao_hidden = []
             for j in range(neuron_hidden):
-                input_j = calculaSomatorioNeuronio(X[i], pesos_hidden[j], bias_hidden[j])
-                funcao_ativacao_hidden.append(sigmoid(input_j))
+                Z_in_hidden = calculaSomatorioNeuronio(X[i], pesos_hidden[j], bias_hidden[j])
+                funcao_ativacao_hidden.append(sigmoid(Z_in_hidden))
 
             #------------------------- Feedforward: Camada de Saída -------------------------
             y_previsto = []
             for o in range(neuron_saida):
-                input_saida = calculaSomatorioNeuronio(funcao_ativacao_hidden, pesos_saida[o], bias_saida[o])
-                y_previsto.append(sigmoid(input_saida))
+                Z_in_saida = calculaSomatorioNeuronio(funcao_ativacao_hidden, pesos_saida[o], bias_saida[o])
+                y_previsto.append(sigmoid(Z_in_saida))
 
             #------------------------- Cálculo do Erro Total -------------------------
-            erro_total += 0.5 * sum((Y[i][o] - y_previsto[o]) ** 2 for o in range(neuron_saida))
+            erro_total += calculaSomaErrosQuadraticos(Y[i], y_previsto)
 
             #------------------------- Delta da Camada de Saída -------------------------
             delta_saida = []
@@ -156,12 +180,19 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
 
     # Salva o arquivo contendo os erros por iteração conforme critério de entrega
     np.savetxt("erros_treinamento.txt", historico_erros, fmt="%.6f")
+    
+    # Chama a função visual do decaimento do erro
+    plotar_grafico_erro(historico_erros)
 
     # ------------------------- Resultados Finais Dinâmicos -------------------------
     print("\nResultados após o treinamento:")
     print('-' * 75)
     print('Amostra | Letra Esperada | Letra Predita | Confiança')
     print('-' * 75)
+    
+    lista_esperados = []
+    lista_previstos = []
+    
     for idx in range(len(X)):
         f_hid = [sigmoid(calculaSomatorioNeuronio(X[idx], pesos_hidden[j], bias_hidden[j])) for j in range(neuron_hidden)]
         y_prev = [sigmoid(calculaSomatorioNeuronio(f_hid, pesos_saida[o], bias_saida[o])) for o in range(neuron_saida)]
@@ -172,9 +203,15 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         letra_esperada = mapeamento_letras[idx_esperado]
         letra_prevista = mapeamento_letras[idx_previsto]
         
+        lista_esperados.append(letra_esperada)
+        lista_previstos.append(letra_prevista)
+        
         print(f"Letra {idx+1:02d} | Em classe: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {max(y_prev):.4f}")
     print("-" * 75 + "\n")
-
+    
+    # Chama a função visual da matriz com as listas preenchidas
+    plotar_matriz_confusao(lista_esperados, lista_previstos)
+    
 def main():
     diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
     
