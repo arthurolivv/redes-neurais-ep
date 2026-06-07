@@ -5,9 +5,9 @@
 #Disciplina: Inteligência Artificial
 #Docente: Sarajane Marques Peres
 #Projeto: Reconhecimento de Caracteres utilizando Redes Neurais Artificiais (MLP) - Multilayer Perceptron
-#
-#
-#
+#Arthur Jacintho de Oliveira Santos - 15635041
+#Diogo Leonel dos Santos -15580980
+#Tae Jin Chun - 15675241
 #Ygor Araujo da Silva - 15506033
 #-----------------------------------------------------------------------------------------------------------------
 
