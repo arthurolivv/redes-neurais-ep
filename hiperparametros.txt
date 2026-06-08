@@ -1,0 +1,12 @@
+--- HIPERPARAMETROS DA ARQUITETURA E TREINAMENTO DA REDE NEURAL ---
+
+--- Estrutura da Rede ---
+Neurônios na Camada de Entrada: 120
+Neurônios na Camada Oculta: 60
+Neurônios na Camada de Saída: 26
+
+--- Configurações de Aprendizado ---
+Taxa de Aprendizagem (Alpha): 0.1
+Total de Épocas: 150
+Função de Ativação na Camada Oculta: hard_sigmoid
+Função de Ativação na Camada de Saída: hard_sigmoid

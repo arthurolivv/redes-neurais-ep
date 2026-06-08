@@ -261,7 +261,14 @@ def plotar_grafico_erro(historico_erros):
     plt.xlabel('Épocas')
     plt.ylabel('Erro Total')
     plt.grid(True)
-    plt.show()
+    
+    diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
+    caminho_arquivo = os.path.join(diretorio_do_script, 'grafico_decaimento_erro_treinamento.png')
+    
+    plt.savefig(caminho_arquivo, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"DEBUG: Gráfico de Erros ao longo das Épocas de Treinamento salvo em '{caminho_arquivo}'!")
 
 #Função auxiliar para plotar a matriz de confusão utilizando a biblioteca Seaborn. A matriz de confusão é gerada a partir das listas de valores esperados e previstos, e é exibida como um mapa de calor, facilitando a visualização do desempenho da rede neural na classificação das letras.
 def plotar_matriz_confusao(lista_esperados, lista_previstos):
@@ -269,8 +276,16 @@ def plotar_matriz_confusao(lista_esperados, lista_previstos):
     
     plt.figure(figsize=(12, 10))
     sns.heatmap(matriz, annot=True, fmt='d', cmap='Blues', cbar=False)
-    plt.title('Matriz de Confusão')
-    plt.show()
+    plt.title('Matriz de Confusão dos Resultados do Teste')
+    
+    diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
+    caminho_arquivo = os.path.join(diretorio_do_script, 'matriz_confusao_teste.png')
+    
+    plt.savefig(caminho_arquivo, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"DEBUG: Matriz de Confusão dos Resultados do Teste salva em '{caminho_arquivo}'!")
+    
 def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_letras, funcao_ativacao_oculta, funcao_derivada_oculta, funcao_ativacao_saida, funcao_derivada_saida):
     camada_oculta = rede_neural[0]
     pesos_hidden = camada_oculta["pesos"]
@@ -471,7 +486,7 @@ def main():
     if config_selecionada["camada_saida"] is True:
         funcao_ativacao_saida = config_selecionada["funcao"]
         funcao_derivada_saida = config_selecionada["derivada"]
-        print(f"\nFunção de Ativação {nome_ativacao} aplicada em todas as camadas com sucesso!\n")
+        print(f"\nFunção de Ativação {nome_ativacao} aplicada em todas as camadas com sucesso!")
     else:
         # Forca a Sigmoid na saida por seguranca matematica
         funcao_ativacao_saida = sigmoid
@@ -537,4 +552,4 @@ def main():
     print("-" * 75)  
     
 if __name__ == "__main__":
-    main()
+    main()11
