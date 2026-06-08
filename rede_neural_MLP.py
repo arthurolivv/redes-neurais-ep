@@ -12,14 +12,15 @@
 #-----------------------------------------------------------------------------------------------------------------
 
 import math
+import os
 import random
+import re
 import time
-import seaborn as sns
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import os
-import re
+import seaborn as sns
 
 rede_neural = []
 taxa_aprendizagem = 0.1
@@ -282,7 +283,7 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
     neuron_hidden = len(pesos_hidden)
     neuron_saida = len(pesos_saida)
 
-    #Lista para salvar o histórico de erros (Requisito de entrega!)
+    #Lista para salvar o histórico de erros
     historico_erros = []
 
     for epoca in range(epocas):
@@ -366,7 +367,7 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         lista_previstos.append(letra_prevista)
         
         print(f"Letra {idx+1:02d} | Em classe: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {max(y_prev):.4f}")
-    print(f"DEBUG:Dados de treino processados em {epocas} com sucesso!")
+    print(f"DEBUG: Dados de treino processados em {epocas} com sucesso!")
 
 def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativacao_oculta, funcao_ativacao_saida):
     camada_oculta = rede_neural[0]
@@ -421,9 +422,9 @@ def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativaca
     with open("saidas_teste.txt", "w") as arquivo_teste:
         arquivo_teste.writelines(linhas_arquivo_saida)
 
-    print("DEBUG:Resultados do teste salvos em 'saidas_teste.txt'!")
+    print("DEBUG: Resultados do teste salvos em 'saidas_teste.txt'!")
    
-    #Gera a matriz de confusão para o vídeo
+    #Gera a matriz de confusão
     plotar_matriz_confusao(lista_esperados, lista_previstos)
 
 def main():
@@ -480,7 +481,7 @@ def main():
         print(f"-> Função de Ativação da Camada Oculta: {nome_ativacao}")
         print(f"-> Função de Ativação da Camada de Saída: Sigmoid")
     
-    print(f"Funcao {nome_ativacao} selecionada com sucesso!")
+    print(f"Função {nome_ativacao} selecionada com sucesso!")
     # Ajustado 60 neuronios que serão utilizados na camada oculta
     neuronios_ocultos = 60
     mapeamento = [quantidade_entradas, neuronios_ocultos, quantidade_saidas]
