@@ -186,7 +186,7 @@ catalogo_ativacoes = {
     "8": {"nome": "SELU", "funcao": selu, "derivada": derivada_selu, "camada_saida": False},
     "9": {"nome": "Hard Shrink", "funcao": hard_shrink, "derivada": derivada_hard_shrink, "camada_saida": False},
     "10": {"nome": "Soft Shrink", "funcao": soft_shrink, "derivada": derivada_soft_shrink, "camada_saida": False},
-    "11": {"nome": "Hard Sigmoid", "funcao": hard_sigmoid, "derivada": derivada_hard_sigmoid, "camada_saida": True}
+    "11": {"nome": "Hard Sigmoid", "funcao": hard_sigmoid, "derivada": derivada_hard_sigmoid, "camada_saida": False}
 }
       
 def criaCamada(entradas, neuronios):
@@ -552,4 +552,4 @@ def main():
     print("-" * 75)  
     
 if __name__ == "__main__":
-    main()11
+    main()
