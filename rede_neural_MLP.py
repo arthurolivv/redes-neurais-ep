@@ -13,6 +13,7 @@
 
 import math
 import random
+import time
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
@@ -62,10 +63,10 @@ def carrega_dataset(caminho_x, caminho_y):
     
     tamanho_minimo = min(len(X), len(Y))
     
-    print(f"DEBUG: Dados lidos com sucesso!")
-    print(f"DEBUG: Total de amostras prontas para o treino: {tamanho_minimo}")
+    print(f"DEBUG: Arquivos {caminho_x} e {caminho_y} carregados com sucesso!")
     print("-" * 50)
-    
+    print(f"DEBUG: Total de amostras prontas para o treino: {tamanho_minimo}")
+
     return X[:tamanho_minimo], Y[:tamanho_minimo], categorias
 
 def separar_dados_treino_teste(X, Y, proporcao_treino=0.8):
@@ -216,7 +217,7 @@ def salvar_hiperparametros(caminho_arquivo, entradas, neuronios_ocultos, neuroni
         arquivo.write(f"Total de Épocas: {epocas}\n")
         arquivo.write(f"Função de Ativação na Camada Oculta: {funcao_ativacao_oculta}\n")
         arquivo.write(f"Função de Ativação na Camada de Saída: {funcao_ativacao_saida}\n")
-        
+    
     print(f"DEBUG: Hiperparâmetros salvos em '{caminho_arquivo}'!")
         
 #Função auxiliar para salvar os pesos iniciais da rede neural em um arquivo de texto, organizando os pesos por camada e por neurônio, e formatando os valores com 6 casas decimais para melhor legibilidade.
@@ -365,9 +366,7 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         lista_previstos.append(letra_prevista)
         
         print(f"Letra {idx+1:02d} | Em classe: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {max(y_prev):.4f}")
-    print("\nDEBUG:Dados de treino após a última época processados com sucesso!")
-    print("-" * 75 + "\n")
-
+    print(f"DEBUG:Dados de treino processados em {epocas} com sucesso!")
 
 def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativacao_oculta, funcao_ativacao_saida):
     camada_oculta = rede_neural[0]
@@ -386,9 +385,8 @@ def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativaca
     linhas_arquivo_saida = []
     
     print("-" * 75)
-    print("\nResultados do Conjunto de Teste:")
+    print("Resultados do Conjunto de Teste:")
     print("Amostra | Letra Esperada | Letra Predita | Confiança")
-    print("-" * 75)
 
     for idx in range(len(X_teste)):
         # ------------------------- Feedforward Camada Oculta -------------------------
@@ -417,19 +415,19 @@ def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativaca
         print(f"Teste {idx+1:02d}  | Esperada: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {confianca:.4f}")
         
         # Prepara a linha para salvar no arquivo de log
-        linhas_arquivo_saida.append(f"Amostra {idx+1}: Esperada={letra_esperada}, Predita={letra_prevista}, Confianca={confianca:.4f}\n")
+        linhas_arquivo_saida.append(f"Amostra {idx+1}: Esperada={letra_esperada}, Predita={letra_prevista}, Confiança={confianca:.4f}\n")
 
     # ------------------------- Exportação de Resultados -------------------------
     with open("saidas_teste.txt", "w") as arquivo_teste:
         arquivo_teste.writelines(linhas_arquivo_saida)
 
     print("DEBUG:Resultados do teste salvos em 'saidas_teste.txt'!")
-    print("-" * 75)     
-    
+   
     #Gera a matriz de confusão para o vídeo
     plotar_matriz_confusao(lista_esperados, lista_previstos)
 
 def main():
+    print("Rede Neural - MLP Multilayer Perceptron Detector de Caracteres\n")
     diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
     
     caminho_x = os.path.join(diretorio_do_script, 'files-sarajane', 'CARACTERES COMPLETO', 'X.txt')
@@ -448,7 +446,7 @@ def main():
     print(f"--> Saídas extraídas (Classes mapeadas): {quantidade_saidas}")
     print(f"--> Amostras de Treino (80% de {len(X_dados)}): {len(X_treino)}")
     print(f"--> Amostras de Teste (20% de {len(X_dados)}): {len(X_teste)}")
-    print("-" * 50 + "\n")
+    print("-" * 50)
 
     print("Escolha uma função de ativação abaixo para a rede neural:")
     # O loop varre o dicionario e exibe todas as chaves e nomes disponiveis das diferentes funcoes de ativacao para o usuario escolher, garantindo que a escolha seja valida e armazenando as funcoes de ativacao e derivada correspondentes para o treinamento da rede neural.
@@ -472,17 +470,17 @@ def main():
     if config_selecionada["camada_saida"] is True:
         funcao_ativacao_saida = config_selecionada["funcao"]
         funcao_derivada_saida = config_selecionada["derivada"]
-        print(f"\nFunção {nome_ativacao} aplicada em todas as camadas com sucesso!\n")
+        print(f"\nFunção de Ativação {nome_ativacao} aplicada em todas as camadas com sucesso!\n")
     else:
         # Forca a Sigmoid na saida por seguranca matematica
         funcao_ativacao_saida = sigmoid
         funcao_derivada_saida = derivada_sigmoid
         print(f"\nAviso Arquitetural:")
-        print(f"A função {nome_ativacao} é incompatível com a saída, pois não retorna valores no intervalo [0, 1]. Portanto, a função de ativação da camada de saída foi automaticamente definida como Sigmoid para garantir a correta classificação das letras. A função {nome_ativacao} será utilizada apenas na camada oculta.")
-        print(f"-> Camada Oculta: {nome_ativacao}")
-        print(f"-> Camada de Saída: Sigmoid")
+        print(f"A função {nome_ativacao} é incompatível com a saída, pois não retorna valores estritos no intervalo [0, 1]. Portanto, a função de ativação da camada de saída foi automaticamente definida como Sigmoid para garantir a correta classificação das letras, pois a função sigmoid retorna apenas valores no intervalo ]0, 1[. Logo, a função {nome_ativacao} será utilizada apenas na camada oculta.")
+        print(f"-> Função de Ativação da Camada Oculta: {nome_ativacao}")
+        print(f"-> Função de Ativação da Camada de Saída: Sigmoid")
     
-    print(f"Funcao {nome_ativacao} selecionada com sucesso!\n")
+    print(f"Funcao {nome_ativacao} selecionada com sucesso!")
     # Ajustado 60 neuronios que serão utilizados na camada oculta
     neuronios_ocultos = 60
     mapeamento = [quantidade_entradas, neuronios_ocultos, quantidade_saidas]
@@ -497,7 +495,8 @@ def main():
         
     #Salva os hiperparâmetros da arquitetura e do treinamento da rede neural em um arquivo de texto para documentação
     caminho_hiperparametros = os.path.join(diretorio_do_script, "hiperparametros.txt")
-    epocas_treino = 300
+    epocas_treino = 150
+    print('-' * 75)
     salvar_hiperparametros(
         caminho_hiperparametros, quantidade_entradas, neuronios_ocultos, 
         quantidade_saidas, taxa_aprendizagem, epocas_treino, funcao_ativacao_oculta.__name__, funcao_ativacao_saida.__name__
@@ -505,20 +504,36 @@ def main():
     
     #Salva os pesos iniciais gerados aleatoriamente na rede neural antes de iniciar o treinamento
     salvar_pesos("pesos_iniciais.txt", rede_neural)
-    print(f"DEBUG: Pesos iniciais salvos em '{diretorio_do_script}+\\pesos_iniciais.txt'!")    
-        
+    print(f"DEBUG: Pesos iniciais salvos em '{diretorio_do_script}+\\pesos_iniciais.txt'!") 
+    print('-' * 75)   
+    
     #Executa o backpropagation passando o conjunto de treino, a rede neural, a taxa de aprendizagem, o número de épocas, o mapeamento das letras e as funções de ativação e derivada selecionadas para o treinamento da rede neural. O backpropagation irá ajustar os pesos da rede neural com base nos erros calculados durante o processo de treinamento, visando minimizar o erro total e melhorar a capacidade de classificação dos caracteres.
+    inicio_treino = time.perf_counter()
+    print("Iniciando o Treinamento da Rede Neural\n")
     backpropagation(
         X_treino, Y_treino, rede_neural, taxa_aprendizagem, 
         epocas_treino, mapeamento_letras, funcao_ativacao_oculta, funcao_derivada_oculta, funcao_ativacao_saida, funcao_derivada_saida
     )
+    fim_treino = time.perf_counter()
+    tempo_total_treino = fim_treino - inicio_treino
+    minutos_treino = int(tempo_total_treino // 60)
+    segundos_treino = tempo_total_treino % 60
+    print(f"Tempo gasto no treinamento: {minutos_treino} {'minuto' if minutos_treino == 1 else 'minutos'} e {segundos_treino:.3f} {'segundo' if round(segundos_treino, 3) == 1.0 else 'segundos'}")
+    print("-" * 75)
     
     #Salva os pesos finais da rede neural após o treinamento
     salvar_pesos("pesos_finais.txt", rede_neural)
     print(f"DEBUG: Pesos finais salvos em '{diretorio_do_script}+\\pesos_finais.txt'!")
     
     #Avaliação final utilizando os dados de teste
+    inicio_teste = time.perf_counter()
     testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativacao_oculta, funcao_ativacao_saida)
+    fim_teste = time.perf_counter()
+    tempo_total_teste = fim_teste - inicio_teste
+    minutos_teste = int(tempo_total_teste // 60)
+    segundos_teste = tempo_total_teste % 60
+    print(f"Tempo gasto no teste: {minutos_teste} {'minuto' if minutos_teste == 1 else 'minutos'} e {segundos_teste:.3f} {'segundo' if round(segundos_teste, 3) == 1.0 else 'segundos'}")
+    print("-" * 75)  
     
 if __name__ == "__main__":
     main()
