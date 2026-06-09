@@ -305,44 +305,43 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         erro_total = 0
 
         for i in range(len(X)):
-
-            # Feedforward: Camada Oculta
+            # ------------------------- Feedforward: Camada Oculta -------------------------
             funcao_ativacao_hidden = []
             for j in range(neuron_hidden):
                 Z_in_hidden = calculaSomatorioNeuronio(X[i], pesos_hidden[j], bias_hidden[j])
                 # Substitui a chamada fixa pela variavel dinamica
                 funcao_ativacao_hidden.append(funcao_ativacao_oculta(Z_in_hidden))
 
-            # Feedforward: Camada de Saida
+            # ------------------------- Feedforward: Camada de Saida -------------------------
             y_previsto = []
             for o in range(neuron_saida):
                 Z_in_saida = calculaSomatorioNeuronio(funcao_ativacao_hidden, pesos_saida[o], bias_saida[o])
                 y_previsto.append(funcao_ativacao_saida(Z_in_saida))
 
-            # Calculo do Erro Total
+            # ------------------------- Calculo do Erro Total -------------------------
             erro_total += calculaSomaErrosQuadraticos(Y[i], y_previsto)
 
-            # Delta da Camada de Saida
+            # ------------------------- Delta da Camada de Saida -------------------------
             delta_saida = []
             for o in range(neuron_saida):
                 # Substitui a derivada fixa pela dinamica
                 d_out = (Y[i][o] - y_previsto[o]) * funcao_derivada_saida(y_previsto[o])
                 delta_saida.append(d_out)
 
-            # Delta da Camada Oculta
+            # ------------------------- Delta da Camada Oculta -------------------------
             delta_hidden = []
             for j in range(neuron_hidden):
                 soma_erro = sum(delta_saida[o] * pesos_saida[o][j] for o in range(neuron_saida))
                 d_hid = funcao_derivada_oculta(funcao_ativacao_hidden[j]) * soma_erro
                 delta_hidden.append(d_hid)  
 
-            #------------------------- Atualização: Camada de Saída -------------------------
+            # ------------------------- Atualização: Camada de Saída -------------------------
             for o in range(neuron_saida):
                 for j in range(neuron_hidden):
                     pesos_saida[o][j] += taxa_aprendizagem * delta_saida[o] * funcao_ativacao_hidden[j]
                 bias_saida[o] += taxa_aprendizagem * delta_saida[o]
 
-            #------------------------- Atualização: Camada Oculta -------------------------
+            # ------------------------- Atualização: Camada Oculta -------------------------
             for j in range(neuron_hidden):
                 for k in range(len(X[i])):
                     pesos_hidden[j][k] += taxa_aprendizagem * delta_hidden[j] * X[i][k]
