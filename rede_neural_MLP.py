@@ -86,6 +86,21 @@ def separar_dados_treino_teste(X, Y, proporcao_treino=0.8):
     
     return list(X_treino), list(Y_treino), list(X_teste), list(Y_teste)
 
+
+def separar_validacao(X_treino, Y_treino, proporcao_validacao=0.1):
+    
+    dados_combinados = list(zip(X_treino, Y_treino))
+    random.shuffle(dados_combinados)
+
+    tamanho_val = int(len(dados_combinados) * proporcao_validacao)
+    val = dados_combinados[:tamanho_val]
+    treino_red = dados_combinados[tamanho_val:]
+
+    X_val, Y_val = zip(*val)
+    X_treino_red, Y_treino_red = zip(*treino_red)
+
+    return list(X_treino_red), list(Y_treino_red), list(X_val), list(Y_val)
+
 #Funções de Ativação e suas Derivadas para o Backpropagation
 #Sigmoid
 def sigmoid(Z_in):
@@ -205,8 +220,79 @@ def criaCamada(entradas, neuronios):
         "bias": bias_rede_neural
     }
 
+def copiar_rede(rede):
+    """Retorna uma cópia independente de todos os pesos e bias da rede."""
+    copia = []
+    for camada in rede:
+        copia.append({
+            "pesos": [list(neuronio) for neuronio in camada["pesos"]],
+            "bias": list(camada["bias"])
+        })
+    return copia
+
+
+def restaurar_rede(rede, copia):
+    """Sobrescreve os pesos e bias da rede com os valores da cópia."""
+    for idx_camada, camada in enumerate(rede):
+        for idx_n, _ in enumerate(camada["pesos"]):
+            camada["pesos"][idx_n] = list(copia[idx_camada]["pesos"][idx_n])
+        camada["bias"] = list(copia[idx_camada]["bias"])
+
+
+def calcular_erro_conjunto(X, Y, rede_neural, funcao_ativacao_oculta, funcao_ativacao_saida):
+    """Calcula o erro quadrático total sobre um conjunto (sem backprop)."""
+    pesos_hidden = rede_neural[0]["pesos"]
+    bias_hidden  = rede_neural[0]["bias"]
+    pesos_saida  = rede_neural[1]["pesos"]
+    bias_saida   = rede_neural[1]["bias"]
+
+    neuron_hidden = len(pesos_hidden)
+    neuron_saida  = len(pesos_saida)
+    erro_total = 0.0
+
+    for i in range(len(X)):
+        f_hid = [
+            funcao_ativacao_oculta(calculaSomatorioNeuronio(X[i], pesos_hidden[j], bias_hidden[j]))
+            for j in range(neuron_hidden)
+        ]
+        y_prev = [
+            funcao_ativacao_saida(calculaSomatorioNeuronio(f_hid, pesos_saida[o], bias_saida[o]))
+            for o in range(neuron_saida)
+        ]
+        erro_total += calculaSomaErrosQuadraticos(Y[i], y_prev)
+
+    return erro_total
+
+
+def calcular_acuracia_conjunto(X, Y, rede_neural, funcao_ativacao_oculta, funcao_ativacao_saida):
+    """Retorna a acurácia percentual (0–100) sobre um conjunto de amostras."""
+    pesos_hidden = rede_neural[0]["pesos"]
+    bias_hidden  = rede_neural[0]["bias"]
+    pesos_saida  = rede_neural[1]["pesos"]
+    bias_saida   = rede_neural[1]["bias"]
+
+    neuron_hidden = len(pesos_hidden)
+    neuron_saida  = len(pesos_saida)
+    acertos = 0
+
+    for i in range(len(X)):
+        f_hid = [
+            funcao_ativacao_oculta(calculaSomatorioNeuronio(X[i], pesos_hidden[j], bias_hidden[j]))
+            for j in range(neuron_hidden)
+        ]
+        y_prev = [
+            funcao_ativacao_saida(calculaSomatorioNeuronio(f_hid, pesos_saida[o], bias_saida[o]))
+            for o in range(neuron_saida)
+        ]
+        if y_prev.index(max(y_prev)) == Y[i].index(max(Y[i])):
+            acertos += 1
+
+    return (acertos / len(X)) * 100.0
+
 #Função auxiliar para salvar os hiperparâmetros da arquitetura e do treinamento da rede neural em um arquivo de texto
-def salvar_hiperparametros(caminho_arquivo, entradas, neuronios_ocultos, neuronios_saidas, taxa_aprendizagem, epocas, funcao_ativacao_oculta, funcao_ativacao_saida):
+def salvar_hiperparametros(caminho_arquivo, entradas, neuronios_ocultos, neuronios_saidas, taxa_aprendizagem, epocas,
+                           funcao_ativacao_oculta, funcao_ativacao_saida,
+                           paciencia_early_stopping, delta_minimo_early_stopping):
     with open(caminho_arquivo, "w", encoding="utf-8") as arquivo:
         arquivo.write("--- HIPERPARAMETROS DA ARQUITETURA E TREINAMENTO DA REDE NEURAL ---\n\n")
         
@@ -217,9 +303,13 @@ def salvar_hiperparametros(caminho_arquivo, entradas, neuronios_ocultos, neuroni
         
         arquivo.write("--- Configurações de Aprendizado ---\n")
         arquivo.write(f"Taxa de Aprendizagem (Alpha): {taxa_aprendizagem}\n")
-        arquivo.write(f"Total de Épocas: {epocas}\n")
+        arquivo.write(f"Total de Épocas (máximo): {epocas}\n")
         arquivo.write(f"Função de Ativação na Camada Oculta: {funcao_ativacao_oculta}\n")
-        arquivo.write(f"Função de Ativação na Camada de Saída: {funcao_ativacao_saida}\n")
+        arquivo.write(f"Função de Ativação na Camada de Saída: {funcao_ativacao_saida}\n\n")
+
+        arquivo.write("--- Configurações de Early Stopping ---\n")
+        arquivo.write(f"Paciência (épocas sem melhora): {paciencia_early_stopping}\n")
+        arquivo.write(f"Delta Mínimo (melhora mínima aceitável): {delta_minimo_early_stopping}\n")
     
     print(f"DEBUG: Hiperparâmetros salvos em '{caminho_arquivo}'!")
         
@@ -255,22 +345,56 @@ def calculaSomatorioNeuronio(entradas, pesos_neuronio, bias_neuronio):
 def calculaSomaErrosQuadraticos(y_real, y_previsto):
     return 0.5 * sum((y_real[k] - y_previsto[k]) ** 2 for k in range(len(y_real)))
 
-#Função auxiliar para plotar o gráfico de erro total ao longo das épocas, utilizando a biblioteca Matplotlib. O gráfico exibe o decaimento do erro total, permitindo visualizar a convergência do treinamento da rede neural.
-def plotar_grafico_erro(historico_erros):
+
+def plotar_grafico_erro(historico_erros, historico_erros_val=None, epoca_parada=None,
+                        historico_acuracia_treino=None, historico_acuracia_val=None):
+    diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
+
+    # ---- Gráfico 1: Erro ----
     plt.figure(figsize=(10, 6))
-    plt.plot(historico_erros, color='blue', linewidth=2)
+    plt.plot(historico_erros, color='blue', linewidth=2, label='Erro de Treino')
+
+    if historico_erros_val:
+        plt.plot(historico_erros_val, color='orange', linewidth=2, linestyle='--', label='Erro de Validação')
+
+    if epoca_parada is not None:
+        plt.axvline(x=epoca_parada, color='red', linestyle=':', linewidth=1.5,
+                    label=f'Early Stopping (época {epoca_parada + 1})')
+
     plt.title('Decaimento do Erro Total ao Longo das Épocas')
     plt.xlabel('Épocas')
     plt.ylabel('Erro Total')
+    plt.legend()
     plt.grid(True)
-    
-    diretorio_do_script = os.path.dirname(os.path.abspath(__file__))
-    caminho_arquivo = os.path.join(diretorio_do_script, 'grafico_decaimento_erro_treinamento.png')
-    
-    plt.savefig(caminho_arquivo, dpi=300, bbox_inches='tight')
+
+    caminho_erro = os.path.join(diretorio_do_script, 'grafico_decaimento_erro_treinamento.png')
+    plt.savefig(caminho_erro, dpi=300, bbox_inches='tight')
     plt.close()
-    
-    print(f"DEBUG: Gráfico de Erros ao longo das Épocas de Treinamento salvo em '{caminho_arquivo}'!")
+    print(f"DEBUG: Gráfico de Erros ao longo das Épocas de Treinamento salvo em '{caminho_erro}'!")
+
+    # ---- Gráfico 2: Acurácia (apenas se os históricos foram fornecidos) ----
+    if historico_acuracia_treino:
+        plt.figure(figsize=(10, 6))
+        plt.plot(historico_acuracia_treino, color='blue', linewidth=2, label='Acurácia de Treino')
+
+        if historico_acuracia_val:
+            plt.plot(historico_acuracia_val, color='orange', linewidth=2, linestyle='--', label='Acurácia de Validação')
+
+        if epoca_parada is not None:
+            plt.axvline(x=epoca_parada, color='red', linestyle=':', linewidth=1.5,
+                        label=f'Early Stopping (época {epoca_parada + 1})')
+
+        plt.title('Acurácia Média ao Longo das Épocas')
+        plt.xlabel('Épocas')
+        plt.ylabel('Acurácia (%)')
+        plt.ylim(0, 105)
+        plt.legend()
+        plt.grid(True)
+
+        caminho_acuracia = os.path.join(diretorio_do_script, 'grafico_acuracia_treinamento.png')
+        plt.savefig(caminho_acuracia, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"DEBUG: Gráfico de Acurácia ao longo das Épocas salvo em '{caminho_acuracia}'!")
 
 #Função auxiliar para plotar a matriz de confusão utilizando a biblioteca Seaborn. A matriz de confusão é gerada a partir das listas de valores esperados e previstos, e é exibida como um mapa de calor, facilitando a visualização do desempenho da rede neural na classificação das letras.
 def plotar_matriz_confusao(lista_esperados, lista_previstos):
@@ -287,8 +411,14 @@ def plotar_matriz_confusao(lista_esperados, lista_previstos):
     plt.close()
     
     print(f"DEBUG: Matriz de Confusão dos Resultados do Teste salva em '{caminho_arquivo}'!")
-    
-def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_letras, funcao_ativacao_oculta, funcao_derivada_oculta, funcao_ativacao_saida, funcao_derivada_saida):
+
+
+def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_letras,
+                    funcao_ativacao_oculta, funcao_derivada_oculta,
+                    funcao_ativacao_saida, funcao_derivada_saida,
+                    X_val=None, Y_val=None,
+                    paciencia=10, delta_minimo=1e-4):
+
     camada_oculta = rede_neural[0]
     pesos_hidden = camada_oculta["pesos"]
     bias_hidden  = camada_oculta["bias"]
@@ -300,8 +430,18 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
     neuron_hidden = len(pesos_hidden)
     neuron_saida = len(pesos_saida)
 
-    #Lista para salvar o histórico de erros
-    historico_erros = []
+    # Listas para salvar o histórico de erros e acurácias
+    historico_erros            = []
+    historico_erros_val        = []
+    historico_acuracia_treino  = []
+    historico_acuracia_val     = []
+
+    # ---- Estado do Early Stopping ----
+    usar_early_stopping  = (X_val is not None and Y_val is not None)
+    melhor_erro_val      = float('inf')   # menor erro de validação visto até agora
+    contador_paciencia   = 0              # épocas consecutivas sem melhora
+    melhores_pesos       = None           # snapshot dos pesos da melhor época
+    melhor_epoca         = 0             # índice da melhor época (0-based)
 
     for epoca in range(epocas):
         erro_total = 0
@@ -311,7 +451,6 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
             funcao_ativacao_hidden = []
             for j in range(neuron_hidden):
                 Z_in_hidden = calculaSomatorioNeuronio(X[i], pesos_hidden[j], bias_hidden[j])
-                # Substitui a chamada fixa pela variavel dinamica
                 funcao_ativacao_hidden.append(funcao_ativacao_oculta(Z_in_hidden))
 
             # ------------------------- Feedforward: Camada de Saida -------------------------
@@ -326,7 +465,6 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
             # ------------------------- Delta da Camada de Saida -------------------------
             delta_saida = []
             for o in range(neuron_saida):
-                # Substitui a derivada fixa pela dinamica
                 d_out = (Y[i][o] - y_previsto[o]) * funcao_derivada_saida(y_previsto[o])
                 delta_saida.append(d_out)
 
@@ -350,14 +488,68 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
                 bias_hidden[j] += taxa_aprendizagem * delta_hidden[j]
 
         historico_erros.append(erro_total)
-        if (epoca + 1) % 100 == 0 or epoca == 0:
-            print(f"Época {epoca+1}/{epocas} - Erro Total: {erro_total:.6f}")
+
+        # ---- Acurácia do conjunto de treino nesta época ----
+        acuracia_treino = calcular_acuracia_conjunto(
+            X, Y, rede_neural, funcao_ativacao_oculta, funcao_ativacao_saida
+        )
+        historico_acuracia_treino.append(acuracia_treino)
+
+        # ---- Avaliação no Conjunto de Validação (Early Stopping) ----
+        if usar_early_stopping:
+            erro_val = calcular_erro_conjunto(
+                X_val, Y_val, rede_neural, funcao_ativacao_oculta, funcao_ativacao_saida
+            )
+            historico_erros_val.append(erro_val)
+
+            # Acurácia de validação nesta época
+            acuracia_val = calcular_acuracia_conjunto(
+                X_val, Y_val, rede_neural, funcao_ativacao_oculta, funcao_ativacao_saida
+            )
+            historico_acuracia_val.append(acuracia_val)
+
+            # Verifica se houve melhora significativa
+            if erro_val < melhor_erro_val - delta_minimo:
+                melhor_erro_val    = erro_val
+                contador_paciencia = 0
+                melhores_pesos     = copiar_rede(rede_neural)   # salva snapshot
+                melhor_epoca       = epoca
+            else:
+                contador_paciencia += 1
+
+            if (epoca + 1) % 100 == 0 or epoca == 0:
+                print(f"Época {epoca+1}/{epocas} - Erro Treino: {erro_total:.6f} | "
+                      f"Acurácia Treino: {acuracia_treino:.2f}% | "
+                      f"Erro Validação: {erro_val:.6f} | "
+                      f"Acurácia Validação: {acuracia_val:.2f}% | "
+                      f"Paciência: {contador_paciencia}/{paciencia}")
+
+            # Critério de parada: paciência esgotada
+            if contador_paciencia >= paciencia:
+                print(f"\n[Early Stopping] Treinamento interrompido na época {epoca+1}.")
+                print(f"[Early Stopping] Melhor época: {melhor_epoca+1} | "
+                      f"Melhor erro de validação: {melhor_erro_val:.6f}")
+                # Restaura os pesos da melhor época antes de encerrar
+                restaurar_rede(rede_neural, melhores_pesos)
+                print("[Early Stopping] Pesos restaurados para a melhor época.")
+                break
+        else:
+            if (epoca + 1) % 100 == 0 or epoca == 0:
+                print(f"Época {epoca+1}/{epocas} - Erro Total: {erro_total:.6f} | "
+                      f"Acurácia Treino: {acuracia_treino:.2f}%")
 
     # Salva o arquivo contendo os erros por épocas
     np.savetxt("erros_treinamento.txt", historico_erros, fmt="%.6f")
     
-    # Chama a função visual do decaimento do erro
-    plotar_grafico_erro(historico_erros)
+    # Chama a função visual do decaimento do erro (passa a época de parada quando aplicável)
+    epoca_parada = melhor_epoca if (usar_early_stopping and contador_paciencia >= paciencia) else None
+    plotar_grafico_erro(
+        historico_erros,
+        historico_erros_val if usar_early_stopping else None,
+        epoca_parada,
+        historico_acuracia_treino,
+        historico_acuracia_val if usar_early_stopping else None
+    )
 
     # ------------------------- Resultados Finais Dinâmicos -------------------------
     print("\nResultados após o treinamento:")
@@ -369,7 +561,6 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
     lista_previstos = []
     
     for idx in range(len(X)):
-        #Passa o X de cada amostra pelo feedforward da camada oculta e da camada de saída utilizando as funções de ativação selecionadas, para obter a previsão final da letra correspondente a cada amostra. Em seguida, compara a letra prevista com a letra esperada, mapeando os índices para as letras correspondentes usando o mapeamento_letras, e armazena os resultados em listas para posterior avaliação e visualização.
         f_hid = [funcao_ativacao_oculta(calculaSomatorioNeuronio(X[idx], pesos_hidden[j], bias_hidden[j])) for j in range(neuron_hidden)]
         y_prev = [funcao_ativacao_saida(calculaSomatorioNeuronio(f_hid, pesos_saida[o], bias_saida[o])) for o in range(neuron_saida)]
         
@@ -383,7 +574,7 @@ def backpropagation(X, Y, rede_neural, taxa_aprendizagem, epocas, mapeamento_let
         lista_previstos.append(letra_prevista)
         
         print(f"Letra {idx+1:02d} | Em classe: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {max(y_prev):.4f}")
-    print(f"DEBUG: Dados de treino processados em {epocas} com sucesso!")
+    print(f"DEBUG: Dados de treino processados em {epocas} épocas com sucesso!")
 
 def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativacao_oculta, funcao_ativacao_saida):
     camada_oculta = rede_neural[0]
@@ -400,7 +591,8 @@ def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativaca
     lista_esperados = []
     lista_previstos = []
     linhas_arquivo_saida = []
-    
+    acertos_teste = 0
+
     print("-" * 75)
     print("Resultados do Conjunto de Teste:")
     print("Amostra | Letra Esperada | Letra Predita | Confiança")
@@ -428,15 +620,24 @@ def testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativaca
         
         lista_esperados.append(letra_esperada)
         lista_previstos.append(letra_prevista)
+
+        if letra_prevista == letra_esperada:
+            acertos_teste += 1
         
         print(f"Teste {idx+1:02d}  | Esperada: {letra_esperada}      | Predita: {letra_prevista}      | Confiança: {confianca:.4f}")
         
         # Prepara a linha para salvar no arquivo de log
         linhas_arquivo_saida.append(f"Amostra {idx+1}: Esperada={letra_esperada}, Predita={letra_prevista}, Confiança={confianca:.4f}\n")
 
+    # ------------------------- Acurácia Final do Teste -------------------------
+    acuracia_teste = (acertos_teste / len(X_teste)) * 100
+    print("-" * 75)
+    print(f"Acurácia no Conjunto de Teste: {acertos_teste}/{len(X_teste)} amostras corretas ({acuracia_teste:.2f}%)")
+
     # ------------------------- Exportação de Resultados -------------------------
     with open("saidas_teste.txt", "w") as arquivo_teste:
         arquivo_teste.writelines(linhas_arquivo_saida)
+        arquivo_teste.write(f"\nAcurácia Final: {acertos_teste}/{len(X_teste)} ({acuracia_teste:.2f}%)\n")
 
     print("DEBUG: Resultados do teste salvos em 'saidas_teste.txt'!")
    
@@ -455,18 +656,23 @@ def main():
     
     #Separa os dados em 80% para treino e 20% para teste, mantendo a correspondencia entre as amostras e as letras que representam
     X_treino, Y_treino, X_teste, Y_teste = separar_dados_treino_teste(X_dados, Y_dados, proporcao_treino=0.8)
+
+    # ---- Separa uma fatia de validação (10% do treino) para o early stopping ----
+    # O conjunto de validação é retirado do treino, não do teste, preservando a
+    # avaliação final imparcial sobre dados completamente não vistos.
+    X_treino, Y_treino, X_val, Y_val = separar_validacao(X_treino, Y_treino, proporcao_validacao=0.1)
     
     quantidade_entradas = len(X_dados[0])
     quantidade_saidas = len(Y_dados[0])
     
     print(f"--> Entradas extraídas (Atributos): {quantidade_entradas}")
     print(f"--> Saídas extraídas (Classes mapeadas): {quantidade_saidas}")
-    print(f"--> Amostras de Treino (80% de {len(X_dados)}): {len(X_treino)}")
-    print(f"--> Amostras de Teste (20% de {len(X_dados)}): {len(X_teste)}")
+    print(f"--> Amostras de Treino (após separar validação): {len(X_treino)}")
+    print(f"--> Amostras de Validação (early stopping): {len(X_val)}")
+    print(f"--> Amostras de Teste: {len(X_teste)}")
     print("-" * 50)
 
     print("Escolha uma função de ativação abaixo para a rede neural:")
-    # O loop varre o dicionario e exibe todas as chaves e nomes disponiveis das diferentes funcoes de ativacao para o usuario escolher, garantindo que a escolha seja valida e armazenando as funcoes de ativacao e derivada correspondentes para o treinamento da rede neural.
     for chave, config in catalogo_ativacoes.items():
         print(f"{chave}: {config['nome']}")
     
@@ -479,17 +685,14 @@ def main():
     config_selecionada = catalogo_ativacoes[escolha]
     nome_ativacao = config_selecionada["nome"]
     
-    # Define as funcoes da Camada Oculta baseadas na escolha do usuario
     funcao_ativacao_oculta = config_selecionada["funcao"]
     funcao_derivada_oculta = config_selecionada["derivada"]
     
-    #Verifica a trava de seguranca para a Camada de Saida
     if config_selecionada["camada_saida"] is True:
         funcao_ativacao_saida = config_selecionada["funcao"]
         funcao_derivada_saida = config_selecionada["derivada"]
         print(f"\nFunção de Ativação {nome_ativacao} aplicada em todas as camadas com sucesso!")
     else:
-        # Forca a Sigmoid na saida por seguranca matematica
         funcao_ativacao_saida = sigmoid
         funcao_derivada_saida = derivada_sigmoid
         print(f"\nAviso Arquitetural:")
@@ -498,7 +701,13 @@ def main():
         print(f"-> Função de Ativação da Camada de Saída: Sigmoid")
     
     print(f"Função {nome_ativacao} selecionada com sucesso!")
-    # Ajustado 60 neuronios que serão utilizados na camada oculta
+
+    # ---- Hiperparâmetros do Early Stopping ----
+    # paciencia: quantas épocas sem melhora o treino tolera antes de parar.
+    # delta_minimo: redução mínima no erro de validação para contar como melhora.
+    paciencia_early_stopping    = 10
+    delta_minimo_early_stopping = 1e-4
+
     neuronios_ocultos = 60
     mapeamento = [quantidade_entradas, neuronios_ocultos, quantidade_saidas]
     
@@ -507,30 +716,35 @@ def main():
     for m in range(len(mapeamento) - 1):
         entrada = mapeamento[m]
         saida = mapeamento[m+1]
-        #entrada é a quantidade de neurônios da camada anterior, e saida é a quantidade de neurônios da camada atual, ou seja, a camada oculta tem 60 neurônios e a camada de saída tem 26 neurônios (correspondente às 26 letras do alfabeto)
         nova_camada = criaCamada(entrada, saida)
         rede_neural.append(nova_camada)
         
-    #Salva os hiperparâmetros da arquitetura e do treinamento da rede neural em um arquivo de texto para documentação
     caminho_hiperparametros = os.path.join(diretorio_do_script, "hiperparametros.txt")
-    epocas_treino = 150
+    epocas_treino = 100
     print('-' * 75)
     salvar_hiperparametros(
-        caminho_hiperparametros, quantidade_entradas, neuronios_ocultos, 
-        quantidade_saidas, taxa_aprendizagem, epocas_treino, funcao_ativacao_oculta.__name__, funcao_ativacao_saida.__name__
+        caminho_hiperparametros, quantidade_entradas, neuronios_ocultos,
+        quantidade_saidas, taxa_aprendizagem, epocas_treino,
+        funcao_ativacao_oculta.__name__, funcao_ativacao_saida.__name__,
+        paciencia_early_stopping, delta_minimo_early_stopping
     )
     
-    #Salva os pesos iniciais gerados aleatoriamente na rede neural antes de iniciar o treinamento
     salvar_pesos("pesos_iniciais.txt", rede_neural)
     print(f"DEBUG: Pesos iniciais salvos em '{diretorio_do_script}+\\pesos_iniciais.txt'!") 
     print('-' * 75)   
     
-    #Executa o backpropagation passando o conjunto de treino, a rede neural, a taxa de aprendizagem, o número de épocas, o mapeamento das letras e as funções de ativação e derivada selecionadas para o treinamento da rede neural. O backpropagation irá ajustar os pesos da rede neural com base nos erros calculados durante o processo de treinamento, visando minimizar o erro total e melhorar a capacidade de classificação dos caracteres.
     inicio_treino = time.perf_counter()
     print("Iniciando o Treinamento da Rede Neural\n")
     backpropagation(
-        X_treino, Y_treino, rede_neural, taxa_aprendizagem, 
-        epocas_treino, mapeamento_letras, funcao_ativacao_oculta, funcao_derivada_oculta, funcao_ativacao_saida, funcao_derivada_saida
+        X_treino, Y_treino, rede_neural, taxa_aprendizagem,
+        epocas_treino, mapeamento_letras,
+        funcao_ativacao_oculta, funcao_derivada_oculta,
+        funcao_ativacao_saida, funcao_derivada_saida,
+        # Parâmetros do Early Stopping:
+        X_val=X_val,
+        Y_val=Y_val,
+        paciencia=paciencia_early_stopping,
+        delta_minimo=delta_minimo_early_stopping
     )
     fim_treino = time.perf_counter()
     tempo_total_treino = fim_treino - inicio_treino
@@ -539,11 +753,9 @@ def main():
     print(f"Tempo gasto no treinamento: {minutos_treino} {'minuto' if minutos_treino == 1 else 'minutos'} e {segundos_treino:.3f} {'segundo' if round(segundos_treino, 3) == 1.0 else 'segundos'}")
     print("-" * 75)
     
-    #Salva os pesos finais da rede neural após o treinamento
     salvar_pesos("pesos_finais.txt", rede_neural)
     print(f"DEBUG: Pesos finais salvos em '{diretorio_do_script}+\\pesos_finais.txt'!")
     
-    #Avaliação final utilizando os dados de teste
     inicio_teste = time.perf_counter()
     testar_rede(X_teste, Y_teste, rede_neural, mapeamento_letras, funcao_ativacao_oculta, funcao_ativacao_saida)
     fim_teste = time.perf_counter()
