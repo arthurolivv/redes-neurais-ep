@@ -189,12 +189,14 @@ catalogo_ativacoes = {
     "11": {"nome": "Hard Sigmoid", "funcao": hard_sigmoid, "derivada": derivada_hard_sigmoid, "camada_saida": False}
 }
       
+#Função auxiliar que recebe o número de entradas e o número de neurônios para criar uma camada da rede neural, onde os pesos são inicializados aleatoriamente entre -0.1 e 0.1, e os bias também são inicializados aleatoriamente no mesmo intervalo. A função retorna um dicionário contendo as listas de pesos e bias para a camada criada.
 def criaCamada(entradas, neuronios):
     pesos_rede_neural = []
     bias_rede_neural = []
     
     for n in range(neuronios):
         #cria uma lista de pesos para cada neurônio de entrada, onde cada peso é um número aleatório entre -0.1 e 0.1, e adiciona essa lista de pesos à lista geral de pesos da rede neural. Além disso, para cada neurônio, também é criado um bias aleatório entre -0.1 e 0.1, que é adicionado à lista de bias da rede neural.
+        #pesos_rede_neural é uma lista de listas
         pesos_rede_neural.append([random.uniform(-0.1, 0.1) for _ in range(entradas)])
         bias_rede_neural.append(random.uniform(-0.1, 0.1))
     
@@ -505,6 +507,7 @@ def main():
     for m in range(len(mapeamento) - 1):
         entrada = mapeamento[m]
         saida = mapeamento[m+1]
+        #entrada é a quantidade de neurônios da camada anterior, e saida é a quantidade de neurônios da camada atual, ou seja, a camada oculta tem 60 neurônios e a camada de saída tem 26 neurônios (correspondente às 26 letras do alfabeto)
         nova_camada = criaCamada(entrada, saida)
         rede_neural.append(nova_camada)
         

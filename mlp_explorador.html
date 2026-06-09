@@ -1,0 +1,368 @@
+
+<style>
+  #mlp-wrap { font-family: var(--font-sans); color: var(--color-text-primary); }
+  #mlp-canvas { display: block; width: 100%; }
+  #mlp-info {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    background: var(--color-background-secondary);
+    min-height: 64px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+  #mlp-info strong { color: var(--color-text-primary); font-weight: 500; }
+  #mlp-info code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--color-background-tertiary);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--color-text-primary);
+  }
+  .mlp-legend {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    font-size: 12px; color: var(--color-text-secondary);
+    margin-bottom: 10px; align-items: center;
+  }
+  .mlp-legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+</style>
+
+<div id="mlp-wrap">
+  <div class="mlp-legend">
+    <span><span class="dot" style="background:#378ADD"></span>Entradas (120 pixels)</span>
+    <span><span class="dot" style="background:#1D9E75"></span>Neurônios ocultos (60)</span>
+    <span><span class="dot" style="background:#D85A30"></span>Saídas A–Z (26)</span>
+    <span><span class="dot" style="background:#7F77DD; border-radius:2px; width:14px; height:6px"></span>Bias</span>
+  </div>
+  <canvas id="mlp-canvas" height="480"></canvas>
+  <div id="mlp-info">Passe o mouse sobre um neurônio ou conexão para ver os detalhes das variáveis do código.</div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('mlp-canvas');
+  const info   = document.getElementById('mlp-info');
+  const W = canvas.offsetWidth || 660;
+  canvas.width  = W;
+  canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const COL = {
+    bg:      dark ? '#1a1a18' : '#ffffff',
+    border:  dark ? '#3a3a38' : '#e0deda',
+    text:    dark ? '#c2c0b6' : '#3d3d3a',
+    muted:   dark ? '#777770' : '#999992',
+    input:   dark ? '#378ADD' : '#185FA5',
+    inputFill: dark ? '#0C447C' : '#E6F1FB',
+    hidden:  dark ? '#1D9E75' : '#0F6E56',
+    hidFill: dark ? '#085041' : '#E1F5EE',
+    output:  dark ? '#D85A30' : '#993C1D',
+    outFill: dark ? '#712B13' : '#FAECE7',
+    bias:    dark ? '#7F77DD' : '#534AB7',
+    biasFill:dark ? '#3C3489' : '#EEEDFE',
+    conn:    dark ? 'rgba(180,178,169,0.10)' : 'rgba(100,98,90,0.10)',
+    connHi:  dark ? 'rgba(239,159,39,0.85)'  : 'rgba(186,117,23,0.85)',
+    connHi2: dark ? 'rgba(93,202,165,0.5)'   : 'rgba(15,110,86,0.4)',
+  };
+
+  const SHOW_IN  = 12;
+  const SHOW_HID = 14;
+  const N_OUT    = 26;
+  const LETTERS  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  const xIn  = 60,  rIn  = 7;
+  const xHid = W * 0.46, rHid = 9;
+  const xOut = W - 55, rOut = 10;
+  const yTop = 44, yBot = 438;
+
+  function ys(n, total, top, bot) {
+    if (total === 1) return (top + bot) / 2;
+    return top + (n / (total - 1)) * (bot - top);
+  }
+
+  const inputNodes  = Array.from({length: SHOW_IN},  (_, i) => ({ x: xIn,  y: ys(i, SHOW_IN,  yTop, yBot), i }));
+  const hiddenNodes = Array.from({length: SHOW_HID}, (_, i) => ({ x: xHid, y: ys(i, SHOW_HID, yTop, yBot), j: i }));
+  const outputNodes = Array.from({length: N_OUT},    (_, i) => ({ x: xOut, y: ys(i, N_OUT,    yTop, yBot), k: i }));
+
+  const bHidX = xIn + (xHid - xIn) * 0.20;
+  const bOutX = xHid + (xOut - xHid) * 0.18;
+  const biasHidden = hiddenNodes.map(n => ({ x: bHidX, y: n.y - 18, j: n.j }));
+  const biasOutput = outputNodes.map(n => ({ x: bOutX, y: n.y - 14, k: n.k }));
+
+  let hovered = null;
+
+  function draw() {
+    ctx.clearRect(0, 0, W, canvas.height);
+
+    ctx.save();
+    ctx.font = '11px var(--font-sans, sans-serif)';
+    ctx.fillStyle = COL.muted;
+    ctx.textAlign = 'center';
+    ctx.fillText('Camada de entrada', xIn,  yTop - 22);
+    ctx.fillText('Pixels 1–120', xIn, yTop - 10);
+    ctx.fillText('Camada oculta', xHid, yTop - 22);
+    ctx.fillText('60 neurônios', xHid, yTop - 10);
+    ctx.fillText('Camada de saída', xOut, yTop - 22);
+    ctx.fillText('26 letras A–Z', xOut, yTop - 10);
+
+    ctx.font = '10px var(--font-sans, sans-serif)';
+    ctx.fillStyle = COL.muted;
+    const midW1 = (xIn + xHid) / 2;
+    const midW2 = (xHid + xOut) / 2;
+    ctx.fillText('pesos_hidden[j][k]', midW1, yTop - 10);
+    ctx.fillText('pesos_saida[o][j]', midW2, yTop - 10);
+    ctx.restore();
+
+    const hovIn  = hovered && hovered.type === 'input'  ? hovered.idx : null;
+    const hovHid = hovered && hovered.type === 'hidden' ? hovered.idx : null;
+    const hovOut = hovered && hovered.type === 'output' ? hovered.idx : null;
+    const hovCI  = hovered && hovered.type === 'conn_ih';
+    const hovCO  = hovered && hovered.type === 'conn_ho';
+    const hovBH  = hovered && hovered.type === 'bias_h' ? hovered.idx : null;
+    const hovBO  = hovered && hovered.type === 'bias_o' ? hovered.idx : null;
+
+    ctx.lineWidth = 0.6;
+    inputNodes.forEach((inp, ii) => {
+      hiddenNodes.forEach((hid, jj) => {
+        const active = hovIn === ii || hovHid === jj ||
+                       (hovCI && hovered.ii === ii && hovered.jj === jj);
+        ctx.strokeStyle = active ? COL.connHi : COL.conn;
+        ctx.lineWidth   = active ? 1.4 : 0.5;
+        ctx.beginPath();
+        ctx.moveTo(inp.x + rIn, inp.y);
+        ctx.lineTo(hid.x - rHid, hid.y);
+        ctx.stroke();
+      });
+    });
+
+    hiddenNodes.forEach((hid, jj) => {
+      outputNodes.forEach((out, kk) => {
+        const active = hovHid === jj || hovOut === kk ||
+                       (hovCO && hovered.jj === jj && hovered.kk === kk);
+        ctx.strokeStyle = active ? COL.connHi2 : COL.conn;
+        ctx.lineWidth   = active ? 1.4 : 0.5;
+        ctx.beginPath();
+        ctx.moveTo(hid.x + rHid, hid.y);
+        ctx.lineTo(out.x - rOut, out.y);
+        ctx.stroke();
+      });
+    });
+
+    biasHidden.forEach((b, jj) => {
+      const active = hovBH === jj || hovHid === jj;
+      ctx.strokeStyle = active ? COL.bias : COL.conn;
+      ctx.lineWidth   = active ? 1.2 : 0.5;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(b.x + 6, b.y + 4);
+      ctx.lineTo(hiddenNodes[jj].x - rHid, hiddenNodes[jj].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    biasOutput.forEach((b, kk) => {
+      const active = hovBO === kk || hovOut === kk;
+      ctx.strokeStyle = active ? COL.bias : COL.conn;
+      ctx.lineWidth   = active ? 1.2 : 0.5;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(b.x + 6, b.y + 4);
+      ctx.lineTo(outputNodes[kk].x - rOut, outputNodes[kk].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    function drawCircle(x, y, r, fill, stroke, label, bold) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      if (label) {
+        ctx.fillStyle = stroke;
+        ctx.font = (bold ? '500 ' : '') + Math.max(8, r - 1) + 'px var(--font-sans, sans-serif)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x, y);
+      }
+    }
+
+    function drawBiasSquare(x, y, active) {
+      const s = 11;
+      ctx.fillStyle = active ? COL.bias : COL.biasFill;
+      ctx.strokeStyle = COL.bias;
+      ctx.lineWidth = active ? 1 : 0.5;
+      ctx.fillRect(x - s/2, y - s/2, s, s);
+      ctx.strokeRect(x - s/2, y - s/2, s, s);
+      ctx.fillStyle = dark ? '#CECBF6' : '#3C3489';
+      ctx.font = '7px var(--font-sans, sans-serif)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('b', x, y);
+    }
+
+    ctx.save();
+    ctx.font = '9px var(--font-sans,sans-serif)';
+    ctx.fillStyle = COL.muted;
+    ctx.textAlign = 'right';
+    ctx.fillText('⋯ 120 pixels', xIn - rIn - 4, (yTop + yBot) / 2);
+    ctx.restore();
+
+    inputNodes.forEach((n, ii) => {
+      const hi = hovIn === ii;
+      drawCircle(n.x, n.y, rIn,
+        hi ? COL.input : COL.inputFill,
+        COL.input,
+        String(ii * Math.floor(120 / SHOW_IN) + 1), hi);
+    });
+
+    ctx.save();
+    ctx.font = '9px var(--font-sans,sans-serif)';
+    ctx.fillStyle = COL.muted;
+    ctx.textAlign = 'center';
+    const midHid = hiddenNodes[Math.floor(SHOW_HID / 2)].y;
+    ctx.fillText('⋯ 60', xHid, midHid + 1);
+    ctx.restore();
+
+    hiddenNodes.forEach((n, jj) => {
+      const hi = hovHid === jj;
+      drawCircle(n.x, n.y, rHid,
+        hi ? COL.hidden : COL.hidFill,
+        COL.hidden,
+        'h' + (jj * Math.floor(60 / SHOW_HID)), hi);
+    });
+
+    outputNodes.forEach((n, kk) => {
+      const hi = hovOut === kk;
+      drawCircle(n.x, n.y, rOut,
+        hi ? COL.output : COL.outFill,
+        COL.output,
+        LETTERS[kk], true);
+    });
+
+    biasHidden.forEach((b, jj) => drawBiasSquare(b.x, b.y, hovBH === jj || hovHid === jj));
+    biasOutput.forEach((b, kk) => drawBiasSquare(b.x, b.y, hovBO === kk || hovOut === kk));
+  }
+
+  function hitTest(mx, my) {
+    for (let ii = 0; ii < inputNodes.length; ii++) {
+      const n = inputNodes[ii];
+      if (Math.hypot(mx - n.x, my - n.y) <= rIn + 4) return { type: 'input', idx: ii, node: n };
+    }
+    for (let jj = 0; jj < hiddenNodes.length; jj++) {
+      const n = hiddenNodes[jj];
+      if (Math.hypot(mx - n.x, my - n.y) <= rHid + 4) return { type: 'hidden', idx: jj, node: n };
+    }
+    for (let kk = 0; kk < outputNodes.length; kk++) {
+      const n = outputNodes[kk];
+      if (Math.hypot(mx - n.x, my - n.y) <= rOut + 4) return { type: 'output', idx: kk, node: n };
+    }
+    for (let jj = 0; jj < biasHidden.length; jj++) {
+      const b = biasHidden[jj];
+      if (Math.abs(mx - b.x) <= 7 && Math.abs(my - b.y) <= 7) return { type: 'bias_h', idx: jj };
+    }
+    for (let kk = 0; kk < biasOutput.length; kk++) {
+      const b = biasOutput[kk];
+      if (Math.abs(mx - b.x) <= 7 && Math.abs(my - b.y) <= 7) return { type: 'bias_o', idx: kk };
+    }
+    for (let ii = 0; ii < inputNodes.length; ii++) {
+      for (let jj = 0; jj < hiddenNodes.length; jj++) {
+        const a = inputNodes[ii], b = hiddenNodes[jj];
+        const dx = b.x - a.x - rIn - rHid, dy = b.y - a.y;
+        const len = Math.hypot(dx, dy);
+        const t = ((mx - a.x - rIn) * dx + (my - a.y) * dy) / (len * len);
+        if (t >= 0 && t <= 1) {
+          const px = a.x + rIn + t * dx, py = a.y + t * dy;
+          if (Math.hypot(mx - px, my - py) < 5) return { type: 'conn_ih', ii, jj };
+        }
+      }
+    }
+    for (let jj = 0; jj < hiddenNodes.length; jj++) {
+      for (let kk = 0; kk < outputNodes.length; kk++) {
+        const a = hiddenNodes[jj], b = outputNodes[kk];
+        const dx = b.x - a.x - rHid - rOut, dy = b.y - a.y;
+        const len = Math.hypot(dx, dy);
+        const t = ((mx - a.x - rHid) * dx + (my - a.y) * dy) / (len * len);
+        if (t >= 0 && t <= 1) {
+          const px = a.x + rHid + t * dx, py = a.y + t * dy;
+          if (Math.hypot(mx - px, my - py) < 5) return { type: 'conn_ho', jj, kk };
+        }
+      }
+    }
+    return null;
+  }
+
+  function describeHover(h) {
+    if (!h) return 'Passe o mouse sobre um neurônio, bias ou conexão para ver os detalhes.';
+    const realI = idx => (idx * Math.floor(120 / SHOW_IN));
+    const realJ = idx => (idx * Math.floor(60  / SHOW_HID));
+    switch (h.type) {
+      case 'input':
+        return `<strong>Pixel de entrada ${realI(h.idx) + 1}</strong> &nbsp;·&nbsp; <code>X[i][${realI(h.idx)}]</code><br>
+                Cada imagem 12×10 gera 120 pixels. Este é um dos 120 valores float que alimentam <strong>todos</strong> os 60 neurônios ocultos.<br>
+                Peso correspondente em cada neurônio oculto j: <code>pesos_hidden[j][${realI(h.idx)}]</code>`;
+      case 'hidden':
+        return `<strong>Neurônio oculto j=${realJ(h.idx)}</strong><br>
+                Recebe 120 pesos: <code>pesos_hidden[${realJ(h.idx)}][0..119]</code> &nbsp;+&nbsp; <code>bias_hidden[${realJ(h.idx)}]</code><br>
+                Soma ponderada: <code>Z_in_hidden = calculaSomatorioNeuronio(X[i], pesos_hidden[${realJ(h.idx)}], bias_hidden[${realJ(h.idx)}])</code><br>
+                Saída ativada: <code>funcao_ativacao_hidden[${realJ(h.idx)}] = funcao_ativacao_oculta(Z_in_hidden)</code>`;
+      case 'output':
+        return `<strong>Neurônio de saída o=${h.idx} — Letra "${LETTERS[h.idx]}"</strong><br>
+                Recebe 60 pesos: <code>pesos_saida[${h.idx}][0..59]</code> &nbsp;+&nbsp; <code>bias_saida[${h.idx}]</code><br>
+                Soma ponderada: <code>Z_in_saida = calculaSomatorioNeuronio(funcao_ativacao_hidden, pesos_saida[${h.idx}], bias_saida[${h.idx}])</code><br>
+                Saída: <code>y_previsto[${h.idx}] = funcao_ativacao_saida(Z_in_saida)</code>`;
+      case 'bias_h':
+        return `<strong>Bias da camada oculta — neurônio j=${realJ(h.idx)}</strong><br>
+                Variável: <code>bias_hidden[${realJ(h.idx)}]</code><br>
+                Inicializado com <code>random.uniform(-0.1, 0.1)</code> via <code>criaCamada(120, 60)</code>.<br>
+                Atualizado no backpropagation: <code>bias_hidden[j] += taxa_aprendizagem × delta_hidden[j]</code>`;
+      case 'bias_o':
+        return `<strong>Bias da camada de saída — neurônio o=${h.idx} ("${LETTERS[h.idx]}")</strong><br>
+                Variável: <code>bias_saida[${h.idx}]</code><br>
+                Inicializado com <code>random.uniform(-0.1, 0.1)</code> via <code>criaCamada(60, 26)</code>.<br>
+                Atualizado no backpropagation: <code>bias_saida[o] += taxa_aprendizagem × delta_saida[o]</code>`;
+      case 'conn_ih':
+        return `<strong>Conexão: pixel ${realI(h.ii) + 1} → neurônio oculto ${realJ(h.jj)}</strong><br>
+                Variável: <code>pesos_hidden[${realJ(h.jj)}][${realI(h.ii)}]</code><br>
+                Atualizado: <code>pesos_hidden[j][k] += taxa_aprendizagem × delta_hidden[${realJ(h.jj)}] × X[i][${realI(h.ii)}]</code><br>
+                Camada: <code>rede_neural[0]["pesos"]</code> → matriz 60 × 120`;
+      case 'conn_ho':
+        return `<strong>Conexão: neurônio oculto ${realJ(h.jj)} → saída ${h.kk} ("${LETTERS[h.kk]}")</strong><br>
+                Variável: <code>pesos_saida[${h.kk}][${realJ(h.jj)}]</code><br>
+                Atualizado: <code>pesos_saida[o][j] += taxa_aprendizagem × delta_saida[${h.kk}] × funcao_ativacao_hidden[${realJ(h.jj)}]</code><br>
+                Camada: <code>rede_neural[1]["pesos"]</code> → matriz 26 × 60`;
+    }
+    return '';
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top)  * scaleY;
+    const hit = hitTest(mx, my);
+    canvas.style.cursor = hit ? 'pointer' : 'default';
+    if (JSON.stringify(hit) !== JSON.stringify(hovered)) {
+      hovered = hit;
+      info.innerHTML = describeHover(hit);
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    hovered = null;
+    info.innerHTML = 'Passe o mouse sobre um neurônio, bias ou conexão para ver os detalhes.';
+    draw();
+  });
+
+  draw();
+})();
+</script>
